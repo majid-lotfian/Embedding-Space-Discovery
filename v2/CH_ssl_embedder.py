@@ -38,10 +38,6 @@ Requirements:
 import os, sys, json, argparse, random
 from typing import Dict, List, Tuple, Optional
 
-# Disable numba JIT so umap/pynndescent don't hang when imported after
-# PyTorch has initialized a CUDA context. No impact on results.
-os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
-
 try:
     import numpy as np
     import pandas as pd
@@ -62,14 +58,6 @@ try:
 except ImportError as e:
     print(f"IMPORT ERROR: {e}", flush=True)
     sys.exit(1)
-
-# umap imported here — before any CUDA activity — so numba initializes
-# without conflicting with an already-active PyTorch CUDA context
-try:
-    import umap
-    HAVE_UMAP = True
-except Exception:
-    HAVE_UMAP = False
 
 SEED = 42
 
@@ -371,16 +359,7 @@ def make_plots(E, y, d, out_dir):
     Z = TSNE(n_components=2, perplexity=perp, init="pca", random_state=SEED).fit_transform(E)
     plot_2d(Z, y, f"t-SNE (dim={d})", os.path.join(out_dir, "tsne_ch3.png"))
 
-    if HAVE_UMAP:
-        print("    UMAP: creating reducer...", flush=True)
-        reducer = umap.UMAP(n_components=2, n_neighbors=min(15, n - 1),
-                                   min_dist=0.1, random_state=SEED, n_jobs=1)
-        print("    UMAP: running fit_transform...", flush=True)
-        Z = reducer.fit_transform(E)
-        print("    UMAP: done.", flush=True)
-        plot_2d(Z, y, f"UMAP (dim={d})", os.path.join(out_dir, "umap_ch3.png"))
-    else:
-        print("    umap-learn not installed — skipping UMAP plot.", flush=True)
+    print("    UMAP skipped — run generate_umap.py separately.", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
