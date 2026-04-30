@@ -66,7 +66,7 @@ except ImportError as e:
 # umap imported here — before any CUDA activity — so numba initializes
 # without conflicting with an already-active PyTorch CUDA context
 try:
-    import umap as umap_module
+    import umap
     HAVE_UMAP = True
 except Exception:
     HAVE_UMAP = False
@@ -372,8 +372,12 @@ def make_plots(E, y, d, out_dir):
     plot_2d(Z, y, f"t-SNE (dim={d})", os.path.join(out_dir, "tsne_ch3.png"))
 
     if HAVE_UMAP:
-        Z = umap_module.UMAP(n_components=2, n_neighbors=min(15, n - 1),
-                             min_dist=0.1, random_state=SEED).fit_transform(E)
+        print("    UMAP: creating reducer...", flush=True)
+        reducer = umap.UMAP(n_components=2, n_neighbors=min(15, n - 1),
+                                   min_dist=0.1, random_state=SEED, n_jobs=1)
+        print("    UMAP: running fit_transform...", flush=True)
+        Z = reducer.fit_transform(E)
+        print("    UMAP: done.", flush=True)
         plot_2d(Z, y, f"UMAP (dim={d})", os.path.join(out_dir, "umap_ch3.png"))
     else:
         print("    umap-learn not installed — skipping UMAP plot.", flush=True)
