@@ -67,11 +67,7 @@ except ImportError as e:
     print(f"IMPORT ERROR: {e}", flush=True)
     sys.exit(1)
 
-try:
-    import umap as umap_module
-    HAVE_UMAP = True
-except ImportError:
-    HAVE_UMAP = False
+HAVE_UMAP = None  # checked lazily on first use
 
 SEED = 42
 
@@ -370,12 +366,13 @@ def make_plots(E, y, d, out_dir):
     Z = TSNE(n_components=2, perplexity=perp, init="pca", random_state=SEED).fit_transform(E)
     plot_2d(Z, y, f"t-SNE (dim={d})", os.path.join(out_dir, "tsne_ch3.png"))
 
-    if HAVE_UMAP:
+    try:
+        import umap as umap_module
         Z = umap_module.UMAP(n_components=2, n_neighbors=min(15, n - 1),
                              min_dist=0.1, random_state=SEED).fit_transform(E)
         plot_2d(Z, y, f"UMAP (dim={d})", os.path.join(out_dir, "umap_ch3.png"))
-    else:
-        print("    umap-learn not installed — skipping UMAP plot.", flush=True)
+    except Exception:
+        print("    umap-learn not available — skipping UMAP plot.", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
