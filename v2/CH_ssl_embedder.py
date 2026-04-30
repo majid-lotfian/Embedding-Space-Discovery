@@ -252,8 +252,11 @@ def ssl_loss(num_recon, cat_recon, x_num, x_cat, mask_num, mask_cat):
         if mask_cat is not None:
             mj = mask_cat[:, j]
             if mj.any():
-                loss = loss + F.cross_entropy(rj[mj], x_cat[mj, j])
-                n += 1
+                targets = x_cat[mj, j]
+                valid = targets < rj.size(1)  # exclude unknown-bucket indices
+                if valid.any():
+                    loss = loss + F.cross_entropy(rj[mj][valid], targets[valid])
+                    n += 1
     return loss / max(n, 1)
 
 def log(msg):
