@@ -36,21 +36,15 @@ Requirements:
 """
 
 import os, sys, json, argparse, random
-
-print("Python started", flush=True)
-
 from typing import Dict, List, Tuple, Optional
 
 try:
     import numpy as np
-    print("numpy ok", flush=True)
     import pandas as pd
-    print("pandas ok", flush=True)
     import torch
     import torch.nn as nn
     import torch.nn.functional as F
     from torch.utils.data import DataLoader, Dataset
-    print("torch ok", flush=True)
     from sklearn.impute import SimpleImputer
     from sklearn.model_selection import StratifiedShuffleSplit
     from sklearn.preprocessing import StandardScaler
@@ -58,16 +52,20 @@ try:
     from sklearn.manifold import TSNE
     from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
     from sklearn.metrics.pairwise import euclidean_distances
-    print("sklearn ok", flush=True)
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-    print("matplotlib ok", flush=True)
 except ImportError as e:
     print(f"IMPORT ERROR: {e}", flush=True)
     sys.exit(1)
 
-HAVE_UMAP = None  # checked lazily on first use
+# umap imported here — before any CUDA activity — so numba initializes
+# without conflicting with an already-active PyTorch CUDA context
+try:
+    import umap as umap_module
+    HAVE_UMAP = True
+except Exception:
+    HAVE_UMAP = False
 
 SEED = 42
 
@@ -369,13 +367,12 @@ def make_plots(E, y, d, out_dir):
     Z = TSNE(n_components=2, perplexity=perp, init="pca", random_state=SEED).fit_transform(E)
     plot_2d(Z, y, f"t-SNE (dim={d})", os.path.join(out_dir, "tsne_ch3.png"))
 
-    try:
-        import umap as umap_module
+    if HAVE_UMAP:
         Z = umap_module.UMAP(n_components=2, n_neighbors=min(15, n - 1),
                              min_dist=0.1, random_state=SEED).fit_transform(E)
         plot_2d(Z, y, f"UMAP (dim={d})", os.path.join(out_dir, "umap_ch3.png"))
-    except Exception:
-        print("    umap-learn not available — skipping UMAP plot.", flush=True)
+    else:
+        print("    umap-learn not installed — skipping UMAP plot.", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
