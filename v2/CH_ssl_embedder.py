@@ -35,7 +35,7 @@ Requirements:
     pip install umap-learn   # optional but recommended
 """
 
-import os, json, argparse, random
+import os, sys, json, argparse, random
 from typing import Dict, List, Tuple, Optional
 
 import numpy as np
@@ -249,11 +249,19 @@ def ssl_loss(num_recon, cat_recon, x_num, x_cat, mask_num, mask_cat):
                 n += 1
     return loss / max(n, 1)
 
+def log(msg):
+    """Print immediately, no buffering."""
+    print(msg, flush=True)
+
 def train_ssl(model, tr_loader, va_loader, device,
               lr=1e-3, wd=1e-4, max_epochs=300, patience=25, mask_frac=0.30):
     model.to(device)
     opt = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=wd)
     best_val, best_state, bad = float("inf"), None, 0
+
+    log(f"    Starting training: max_epochs={max_epochs}, patience={patience}, mask_frac={mask_frac}")
+    log(f"    {'Epoch':>6}  {'Train loss':>12}  {'Val loss':>10}  {'Best':>8}  {'Bad':>5}")
+    log(f"    {'─'*52}")
 
     for epoch in range(1, max_epochs + 1):
         model.train()
@@ -279,8 +287,10 @@ def train_ssl(model, tr_loader, va_loader, device,
                 va_loss += ssl_loss(nr, cr, xn, xc, mn, mc).item(); vb += 1
         va_loss /= max(vb, 1)
 
-        if epoch % 25 == 0:
-            print(f"    epoch {epoch:3d}  train={tr_loss/nb:.4f}  val={va_loss:.4f}")
+        # Print every 10 epochs
+        if epoch % 10 == 0 or epoch == 1:
+            marker = " ◀ best" if va_loss < best_val - 1e-5 else ""
+            log(f"    {epoch:>6}  {tr_loss/nb:>12.5f}  {va_loss:>10.5f}  {best_val:>8.5f}  {bad:>5}{marker}")
 
         if va_loss < best_val - 1e-5:
             best_val = va_loss
@@ -289,7 +299,7 @@ def train_ssl(model, tr_loader, va_loader, device,
         else:
             bad += 1
             if bad >= patience:
-                print(f"    Early stop at epoch {epoch}")
+                log(f"    Early stop at epoch {epoch}  (best val loss: {best_val:.5f})")
                 break
 
     if best_state:
@@ -354,7 +364,7 @@ def make_plots(E, y, d, out_dir):
                              min_dist=0.1, random_state=SEED).fit_transform(E)
         plot_2d(Z, y, f"UMAP (dim={d})", os.path.join(out_dir, "umap_ch3.png"))
     else:
-        print("    umap-learn not installed — skipping UMAP plot.")
+        print("    umap-learn not installed — skipping UMAP plot.", flush=True)
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Main
@@ -374,18 +384,18 @@ def main():
     set_seed(SEED)
     os.makedirs(args.out_dir, exist_ok=True)
 
-    print("\n" + "="*60)
-    print("CH Self-Supervised FT-Transformer Embedder")
-    print("CH3 labels: saved for evaluation only — NOT used in training")
-    print("="*60)
+    print("\n" + "="*60, flush=True)
+    print("CH Self-Supervised FT-Transformer Embedder", flush=True)
+    print("CH3 labels: saved for evaluation only — NOT used in training", flush=True)
+    print("="*60, flush=True)
 
     Xdf, y, num_cols, cat_cols = load_ch_data(args.data)
     N = len(Xdf)
     cls, cnts = np.unique(y, return_counts=True)
-    print(f"N={N}  numeric_features={len(num_cols)}  cat_features={len(cat_cols)}")
-    print(f"Class distribution (for reference only):")
+    print(f"N={N}  numeric_features={len(num_cols)}  cat_features={len(cat_cols)}", flush=True)
+    print(f"Class distribution (for reference only):", flush=True)
     for c, n in zip(cls, cnts):
-        print(f"  CH3={c} ({LABELS.get(c,'?')}): {n} ({100*n/N:.1f}%)")
+        print(f"  CH3={c} ({LABELS.get(c,'?')}): {n} ({100*n/N:.1f}%)", flush=True)
 
     # SSL split (stratified for balance — labels used ONLY to ensure representative split,
     # not in the training objective)
@@ -410,8 +420,8 @@ def main():
                "dims": []}
 
     for d in args.dims:
-        print(f"\n{'─'*60}")
-        print(f"  Embedding dimension: {d}")
+        print(f"\n{'─'*60}", flush=True)
+        print(f"  Embedding dimension: {d}", flush=True)
         d_token = 64 if d >= 32 else 32
         n_heads = 8 if d_token >= 64 else 4
 
@@ -421,12 +431,12 @@ def main():
         model = SSLFTTransformer(len(num_cols), cat_cards,
                                   d_token=d_token, n_heads=n_heads, n_layers=3,
                                   dropout=0.15, repr_dim=d)
-        print(f"  Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+        print(f"  Parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}", flush=True)
 
         best_val_loss = train_ssl(model, tr_loader, va_loader, args.device,
                                    max_epochs=args.max_epochs, patience=args.patience,
                                    mask_frac=args.mask_frac)
-        print(f"  Best validation reconstruction loss: {best_val_loss:.4f}")
+        print(f"  Best validation reconstruction loss: {best_val_loss:.4f}", flush=True)
 
         E = extract_all(model, Xall_n, Xall_c, args.device)
         np.save(os.path.join(dim_dir, "embeddings.npy"), E)
@@ -438,15 +448,15 @@ def main():
         m_train = geometry_metrics(E[tr_idx], y[tr_idx])
         m_val   = geometry_metrics(E[va_idx], y[va_idx])
 
-        print(f"\n  Post-hoc geometry (evaluated against CH3 labels — not used in training):")
-        print(f"  {'Metric':<25} {'All N':>10} {'Train':>10} {'Val (OOS)':>12}")
-        print(f"  {'─'*60}")
+        print(f"\n  Post-hoc geometry (evaluated against CH3 labels — not used in training):", flush=True)
+        print(f"  {'Metric':<25} {'All N':>10} {'Train':>10} {'Val (OOS)':>12}", flush=True)
+        print(f"  {'─'*60}", flush=True)
         for k in ["silhouette", "davies_bouldin", "calinski_harabasz", "separation_ratio"]:
             print(f"  {k:<25} {m_all.get(k, float('nan')):>10.4f} "
                   f"{m_train.get(k, float('nan')):>10.4f} "
                   f"{m_val.get(k, float('nan')):>12.4f}")
 
-        print("\n  Generating plots...")
+        print("\n  Generating plots...", flush=True)
         make_plots(E, y, d, dim_dir)
 
         summary = {"repr_dim": d, "d_token": d_token, "n_heads": n_heads,
@@ -459,9 +469,9 @@ def main():
     with open(os.path.join(args.out_dir, "overall_summary.json"), "w") as f:
         json.dump(overall, f, indent=2)
 
-    print(f"\n{'='*60}")
-    print(f"Done. All outputs saved to: {args.out_dir}")
-    print(f"{'='*60}\n")
+    print(f"\n{'='*60}", flush=True)
+    print(f"Done. All outputs saved to: {args.out_dir}", flush=True)
+    print(f"{'='*60}\n", flush=True)
 
 
 if __name__ == "__main__":
