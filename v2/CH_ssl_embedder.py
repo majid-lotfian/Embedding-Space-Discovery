@@ -36,26 +36,36 @@ Requirements:
 """
 
 import os, sys, json, argparse, random
+
+print("Python started", flush=True)
+
 from typing import Dict, List, Tuple, Optional
 
-import numpy as np
-import pandas as pd
-import torch
-import torch.nn as nn
-import torch.nn.functional as F
-from torch.utils.data import DataLoader, Dataset
-
-from sklearn.impute import SimpleImputer
-from sklearn.model_selection import StratifiedShuffleSplit
-from sklearn.preprocessing import StandardScaler
-from sklearn.decomposition import PCA
-from sklearn.manifold import TSNE
-from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
-from sklearn.metrics.pairwise import euclidean_distances
-
-import matplotlib
-matplotlib.use("Agg")
-import matplotlib.pyplot as plt
+try:
+    import numpy as np
+    print("numpy ok", flush=True)
+    import pandas as pd
+    print("pandas ok", flush=True)
+    import torch
+    import torch.nn as nn
+    import torch.nn.functional as F
+    from torch.utils.data import DataLoader, Dataset
+    print("torch ok", flush=True)
+    from sklearn.impute import SimpleImputer
+    from sklearn.model_selection import StratifiedShuffleSplit
+    from sklearn.preprocessing import StandardScaler
+    from sklearn.decomposition import PCA
+    from sklearn.manifold import TSNE
+    from sklearn.metrics import silhouette_score, davies_bouldin_score, calinski_harabasz_score
+    from sklearn.metrics.pairwise import euclidean_distances
+    print("sklearn ok", flush=True)
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
+    print("matplotlib ok", flush=True)
+except ImportError as e:
+    print(f"IMPORT ERROR: {e}", flush=True)
+    sys.exit(1)
 
 try:
     import umap as umap_module
@@ -72,8 +82,9 @@ def set_seed(seed=SEED):
     random.seed(seed)
     np.random.seed(seed)
     torch.manual_seed(seed)
-    torch.cuda.manual_seed_all(seed)
-    torch.backends.cudnn.deterministic = True
+    if torch.cuda.is_available():
+        torch.cuda.manual_seed_all(seed)
+        torch.backends.cudnn.deterministic = True
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Data loading
@@ -381,13 +392,14 @@ def main():
     parser.add_argument("--device", default=None)
     args = parser.parse_args()
 
-    set_seed(SEED)
     os.makedirs(args.out_dir, exist_ok=True)
 
     print("\n" + "="*60, flush=True)
     print("CH Self-Supervised FT-Transformer Embedder", flush=True)
     print("CH3 labels: saved for evaluation only — NOT used in training", flush=True)
     print("="*60, flush=True)
+
+    set_seed(SEED)
 
     if args.device is None:
         args.device = "cuda" if torch.cuda.is_available() else "cpu"
