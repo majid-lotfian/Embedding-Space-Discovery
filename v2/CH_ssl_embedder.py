@@ -38,9 +38,9 @@ Requirements:
 import os, sys, json, argparse, random
 from typing import Dict, List, Tuple, Optional
 
-# Prevent numba from initializing its CUDA runtime, which conflicts with
-# PyTorch's CUDA context and causes umap import to hang in CLI environments.
-os.environ.setdefault("NUMBA_DISABLE_CUDA", "1")
+# Disable numba JIT so umap/pynndescent don't hang when imported after
+# PyTorch has initialized a CUDA context. No impact on results.
+os.environ.setdefault("NUMBA_DISABLE_JIT", "1")
 
 try:
     import numpy as np
