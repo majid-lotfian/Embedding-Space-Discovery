@@ -378,7 +378,7 @@ def main():
     parser.add_argument("--patience", type=int, default=25)
     parser.add_argument("--mask_frac", type=float, default=0.30)
     parser.add_argument("--batch_size", type=int, default=64)
-    parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
+    parser.add_argument("--device", default=None)
     args = parser.parse_args()
 
     set_seed(SEED)
@@ -388,6 +388,10 @@ def main():
     print("CH Self-Supervised FT-Transformer Embedder", flush=True)
     print("CH3 labels: saved for evaluation only — NOT used in training", flush=True)
     print("="*60, flush=True)
+
+    if args.device is None:
+        args.device = "cuda" if torch.cuda.is_available() else "cpu"
+    print(f"Device: {args.device}", flush=True)
 
     Xdf, y, num_cols, cat_cols = load_ch_data(args.data)
     N = len(Xdf)
